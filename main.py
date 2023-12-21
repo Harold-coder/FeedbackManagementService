@@ -24,7 +24,23 @@ def index():
 def student_reviews():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM Reviews") 
+    order_id = request.args.get('order_id', default=None, type=int)
+    review_id = request.args.get('review_id', default=None, type=int)  # Assuming review_id is an integer
+    student_uni = request.args.get('student_uni', default=None, type=str)
+    cursor = conn.cursor()
+
+    if order_id is not None:
+        # If order_id is provided, fetch reviews based on the order_id
+        cursor.execute("SELECT * FROM Reviews WHERE  reviews.orderid = %s", (order_id,))
+    elif review_id is not None:
+        # If review_id is provided, fetch the specific review based on review_id
+        cursor.execute("SELECT * FROM Reviews WHERE reviews.reviewid = %s", (review_id,))
+    elif student_uni is not None:
+        # If student_uni is provided, fetch reviews based on student_uni
+        cursor.execute("SELECT * FROM Reviews WHERE reviews.studentuni = %s", (student_uni,))
+    else:
+        # If none of the parameters are provided, fetch all reviews
+        cursor.execute("SELECT * FROM Reviews")
     reviews = cursor.fetchall()
     # cursor.close()
     # conn.close()
@@ -77,13 +93,29 @@ def edit_review(review_id):
 @app.route('/manage_reviews')
 def manage_reviews():
     conn = get_db_connection()
+    order_id = request.args.get('order_id', default=None, type=int)
+    review_id = request.args.get('review_id', default=None, type=int)  # Assuming review_id is an integer
+    student_uni = request.args.get('student_uni', default=None, type=str)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM Reviews")
+
+    if order_id is not None:
+        # If order_id is provided, fetch reviews based on the order_id
+        cursor.execute("SELECT * FROM Reviews WHERE  reviews.orderid = %s", (order_id,))
+    elif review_id is not None:
+        # If review_id is provided, fetch the specific review based on review_id
+        cursor.execute("SELECT * FROM Reviews WHERE reviews.reviewid = %s", (review_id,))
+    elif student_uni is not None:
+        # If student_uni is provided, fetch reviews based on student_uni
+        cursor.execute("SELECT * FROM Reviews WHERE reviews.studentuni = %s", (student_uni,))
+    else:
+        # If none of the parameters are provided, fetch all reviews
+        cursor.execute("SELECT * FROM Reviews")
+
     reviews = cursor.fetchall()
+    #print(reviews)
     cursor.close()
     conn.close()
     return render_template('manage_reviews.html', reviews=reviews)
-
 @app.route('/delete_review/<int:review_id>', methods=['POST'])
 def delete_review(review_id):
     conn = get_db_connection()
@@ -96,3 +128,4 @@ def delete_review(review_id):
 
 if __name__ == '__main__':
     app.run(debug=True, port=8012)
+

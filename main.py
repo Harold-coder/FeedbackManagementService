@@ -30,6 +30,7 @@ def student_reviews():
     cursor = conn.cursor()
 
     if order_id is not None:
+        # http://127.0.0.1:8012/student_reviews?review_id=7
         # If order_id is provided, fetch reviews based on the order_id
         cursor.execute("SELECT * FROM Reviews WHERE  reviews.orderid = %s", (order_id,))
     elif review_id is not None:

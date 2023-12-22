@@ -1,8 +1,19 @@
 from flask import Flask, request, jsonify
 import psycopg2
 from datetime import datetime
+import logging
+from logging.handlers import RotatingFileHandler
 
 app = Flask(__name__)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+handler = RotatingFileHandler('feedback-app.log', maxBytes=10000, backupCount=1)
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter('[%(asctime)s] %(levelname)s in %(module)s: %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 # Database connection function
 def get_db_connection():
@@ -38,10 +49,10 @@ def student_reviews():
     conn.close()
     formatted_reviews = [
         {
-            "reviewid": review[0],
+            "review_id": review[0],
             "uni": review[1],
             "orderid": review[2],
-            "inventory_id": review[3],
+            "rating": review[3],
             "review": review[4],
             "date": review[5],
         }
@@ -55,8 +66,8 @@ def add_review():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Get data from JSON request body instead of form data
     data = request.get_json()
+    print(data)
     student_uni = data.get('student_uni')
     order_id = data.get('order_id')
     rating = data.get('rating')
@@ -75,7 +86,6 @@ def edit_review(review_id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Get data from JSON request body instead of form data
     data = request.get_json()
     rating = data.get('rating')
     comment = data.get('comment')
@@ -92,6 +102,18 @@ def edit_review(review_id):
 def delete_review(review_id):
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    cursor.execute("SELECT Comment, Rating, ReviewTime FROM Reviews WHERE ReviewID = %s", (review_id,))
+    review = cursor.fetchone()
+
+    if review is None:
+        conn.close()
+        return jsonify({"error": "Review not found"}), 404
+    
+    deletion_time = datetime.now()
+
+    logger.info(f"Deleting review {review_id}: Comment: '{review[0]}', Rating: {review[1]}, Posted on: {review[2]}, Deleted on: {deletion_time}")
+
     cursor.execute("DELETE FROM Reviews WHERE ReviewID = %s", (review_id,))
     conn.commit()
     cursor.close()
@@ -100,7 +122,7 @@ def delete_review(review_id):
 
 @app.route("/")
 def index():
-    return jsonify({"message": "Welcome to the FeedbackManagement API Hosted on Docker!"})
+    return jsonify({"message": "Welcome to the FeedbackManagement API Hosted on Docker! -  5"})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8012)
+    app.run(debug=True, host='0.0.0.0', port=8012)

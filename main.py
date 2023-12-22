@@ -55,10 +55,12 @@ def add_review():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    student_uni = request.form.get('student_uni')
-    order_id = request.form.get('order_id')
-    rating = request.form.get('rating')
-    comment = request.form.get('comment')
+    # Get data from JSON request body instead of form data
+    data = request.get_json()
+    student_uni = data.get('student_uni')
+    order_id = data.get('order_id')
+    rating = data.get('rating')
+    comment = data.get('comment')
     review_time = datetime.now()
 
     cursor.execute("INSERT INTO Reviews (StudentUNI, OrderID, Rating, Comment, ReviewTime) VALUES (%s, %s, %s, %s, %s)",
@@ -73,8 +75,10 @@ def edit_review(review_id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    rating = request.form.get('rating')
-    comment = request.form.get('comment')
+    # Get data from JSON request body instead of form data
+    data = request.get_json()
+    rating = data.get('rating')
+    comment = data.get('comment')
     updated_time = datetime.now()
 
     cursor.execute("UPDATE Reviews SET Rating = %s, Comment = %s, ReviewTime = %s WHERE ReviewID = %s",

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, request, jsonify
 import psycopg2
 from datetime import datetime
 
@@ -15,108 +15,75 @@ def get_db_connection():
     )
     return connection
 
-@app.route("/")
-def index():
-    return render_template('index.html')
-
-
 @app.route('/student_reviews')
 def student_reviews():
     conn = get_db_connection()
     cursor = conn.cursor()
     order_id = request.args.get('order_id', default=None, type=int)
-    review_id = request.args.get('review_id', default=None, type=int)  # Assuming review_id is an integer
+    review_id = request.args.get('review_id', default=None, type=int)
     student_uni = request.args.get('student_uni', default=None, type=str)
-    cursor = conn.cursor()
 
+    # Fetch reviews based on the query parameters
     if order_id is not None:
-        # http://127.0.0.1:8012/student_reviews?review_id=7
-        # If order_id is provided, fetch reviews based on the order_id
-        cursor.execute("SELECT * FROM Reviews WHERE  reviews.orderid = %s", (order_id,))
+        cursor.execute("SELECT * FROM Reviews WHERE reviews.orderid = %s", (order_id,))
     elif review_id is not None:
-        # If review_id is provided, fetch the specific review based on review_id
         cursor.execute("SELECT * FROM Reviews WHERE reviews.reviewid = %s", (review_id,))
     elif student_uni is not None:
-        # If student_uni is provided, fetch reviews based on student_uni
         cursor.execute("SELECT * FROM Reviews WHERE reviews.studentuni = %s", (student_uni,))
     else:
-        # If none of the parameters are provided, fetch all reviews
         cursor.execute("SELECT * FROM Reviews")
+
     reviews = cursor.fetchall()
-    # cursor.close()
-    # conn.close()
-    return render_template('student_reviews.html', reviews=reviews)
+    cursor.close()
+    conn.close()
+    formatted_reviews = [
+        {
+            "reviewid": review[0],
+            "uni": review[1],
+            "orderid": review[2],
+            "inventory_id": review[3],
+            "review": review[4],
+            "date": review[5],
+        }
+        for review in reviews
+    ]
 
-@app.route('/add_review', methods=['GET', 'POST'])
+    return jsonify(formatted_reviews)
+
+@app.route('/add_review', methods=['POST'])
 def add_review():
-    if request.method == 'POST':
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-        student_uni = request.form['student_uni']
-        order_id = request.form['order_id']
-        rating = request.form['rating']
-        comment = request.form['comment']
-        review_time = datetime.now()  
+    student_uni = request.form.get('student_uni')
+    order_id = request.form.get('order_id')
+    rating = request.form.get('rating')
+    comment = request.form.get('comment')
+    review_time = datetime.now()
 
-        cursor.execute("INSERT INTO Reviews (StudentUNI, OrderID, Rating, Comment, ReviewTime) VALUES (%s, %s, %s, %s, %s)",
-                       (student_uni, order_id, rating, comment, review_time))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return redirect(url_for('student_reviews'))
+    cursor.execute("INSERT INTO Reviews (StudentUNI, OrderID, Rating, Comment, ReviewTime) VALUES (%s, %s, %s, %s, %s)",
+                   (student_uni, order_id, rating, comment, review_time))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return jsonify({"success": "Review added successfully"})
 
-    return render_template('add_review.html')
-
-@app.route('/edit_review/<int:review_id>', methods=['GET', 'POST'])
+@app.route('/edit_review/<int:review_id>', methods=['POST'])
 def edit_review(review_id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    if request.method == 'POST':
-        rating = request.form['rating']
-        comment = request.form['comment']
-        updated_time = datetime.now()  # Get the current date and time
+    rating = request.form.get('rating')
+    comment = request.form.get('comment')
+    updated_time = datetime.now()
 
-        cursor.execute("UPDATE Reviews SET Rating = %s, Comment = %s, ReviewTime = %s WHERE ReviewID = %s",
-                       (rating, comment, updated_time, review_id))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return redirect(url_for('student_reviews'))
-
-    cursor.execute("SELECT * FROM Reviews WHERE ReviewID = %s", (review_id,))
-    review = cursor.fetchone()
+    cursor.execute("UPDATE Reviews SET Rating = %s, Comment = %s, ReviewTime = %s WHERE ReviewID = %s",
+                   (rating, comment, updated_time, review_id))
+    conn.commit()
     cursor.close()
     conn.close()
-    return render_template('edit_review.html', review=review)
+    return jsonify({"success": "Review updated successfully"})
 
-@app.route('/manage_reviews')
-def manage_reviews():
-    conn = get_db_connection()
-    order_id = request.args.get('order_id', default=None, type=int)
-    review_id = request.args.get('review_id', default=None, type=int)  # Assuming review_id is an integer
-    student_uni = request.args.get('student_uni', default=None, type=str)
-    cursor = conn.cursor()
-
-    if order_id is not None:
-        # If order_id is provided, fetch reviews based on the order_id
-        cursor.execute("SELECT * FROM Reviews WHERE  reviews.orderid = %s", (order_id,))
-    elif review_id is not None:
-        # If review_id is provided, fetch the specific review based on review_id
-        cursor.execute("SELECT * FROM Reviews WHERE reviews.reviewid = %s", (review_id,))
-    elif student_uni is not None:
-        # If student_uni is provided, fetch reviews based on student_uni
-        cursor.execute("SELECT * FROM Reviews WHERE reviews.studentuni = %s", (student_uni,))
-    else:
-        # If none of the parameters are provided, fetch all reviews
-        cursor.execute("SELECT * FROM Reviews")
-
-    reviews = cursor.fetchall()
-    #print(reviews)
-    cursor.close()
-    conn.close()
-    return render_template('manage_reviews.html', reviews=reviews)
 @app.route('/delete_review/<int:review_id>', methods=['POST'])
 def delete_review(review_id):
     conn = get_db_connection()
@@ -125,8 +92,11 @@ def delete_review(review_id):
     conn.commit()
     cursor.close()
     conn.close()
-    return redirect(url_for('manage_reviews'))
+    return jsonify({"success": "Review deleted successfully"})
+
+@app.route("/")
+def index():
+    return jsonify({"message": "Welcome to the FeedbackManagement API Hosted on Docker!"})
 
 if __name__ == '__main__':
     app.run(debug=True, port=8012)
-
